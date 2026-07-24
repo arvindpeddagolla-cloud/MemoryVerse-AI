@@ -100,6 +100,24 @@ export const CareerInsightsPage: React.FC = () => {
     }
   };
 
+  const getScoreRank = (score: number) => {
+    if (score >= 85) return 'Excellent';
+    if (score >= 70) return 'Very Good';
+    if (score >= 60) return 'Good';
+    return 'Needs Audit';
+  };
+
+  const getLevelBadgeStyles = (lvl: string) => {
+    const lower = (lvl || '').toLowerCase();
+    if (lower === 'completed' || lower === 'advanced') {
+      return 'bg-emerald-50 text-emerald-600 border border-emerald-100';
+    }
+    if (lower === 'start' || lower === 'beginner') {
+      return 'bg-amber-50 text-amber-600 border border-amber-100';
+    }
+    return 'bg-blue-50 text-blue-600 border border-blue-100'; // Intermediate
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-8 font-sans">
@@ -147,8 +165,8 @@ export const CareerInsightsPage: React.FC = () => {
                         />
                       </svg>
                       <div className="text-center">
-                        <span className="text-3xl font-extrabold text-slate-800 font-mono">{insights.readinessScore}%</span>
-                        <span className="text-[9px] text-slate-400 uppercase block tracking-wider font-bold mt-1">Audit Score</span>
+                        <span className="text-3xl font-extrabold text-slate-800 font-mono leading-none">{insights.readinessScore}</span>
+                        <span className="text-[9px] text-slate-400 uppercase block tracking-wider font-bold mt-1">Ready %</span>
                       </div>
                     </div>
                   </div>
@@ -158,6 +176,14 @@ export const CareerInsightsPage: React.FC = () => {
                     <div className="flex justify-between items-center pb-2 border-b border-slate-100">
                       <span className="font-medium text-slate-500">Industry Matching Rate</span>
                       <span className="font-bold text-slate-800">{insights.industryMatching}%</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                      <span className="font-medium text-slate-500">Score Rank</span>
+                      <span className={`font-bold uppercase tracking-wider text-[10px] ${
+                        insights.readinessScore >= 85 ? 'text-emerald-650' :
+                        insights.readinessScore >= 70 ? 'text-blue-600' :
+                        insights.readinessScore >= 60 ? 'text-amber-500' : 'text-rose-600'
+                      }`}>{getScoreRank(insights.readinessScore)}</span>
                     </div>
                     <div className="flex justify-between items-center pb-2 border-b border-slate-100">
                       <span className="font-medium text-slate-500">Verified Credentials Count</span>
@@ -212,11 +238,11 @@ export const CareerInsightsPage: React.FC = () => {
 
                 {/* Add Skill Form */}
                 <form onSubmit={handleAddSkill} className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 p-4 border border-slate-200 rounded-lg mb-6">
-                  <div className="sm:col-span-2">
+                  <div>
                     <label className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block mb-1">Skill Name</label>
                     <input 
                       type="text" 
-                      placeholder="e.g. Docker, Tailwind, Java"
+                      placeholder="e.g. Docker, Java"
                       value={newSkillName}
                       onChange={(e) => setNewSkillName(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-250 bg-white rounded text-xs font-semibold focus:outline-none focus:border-blue-500 transition"
@@ -240,6 +266,19 @@ export const CareerInsightsPage: React.FC = () => {
                     </select>
                   </div>
 
+                  <div>
+                    <label className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block mb-1">Level</label>
+                    <select 
+                      value={newSkillLevel}
+                      onChange={(e) => setNewSkillLevel(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-250 bg-white rounded text-xs font-semibold focus:outline-none focus:border-blue-500 transition"
+                    >
+                      <option value="Start">Start</option>
+                      <option value="Intermediate">Intermediate</option>
+                      <option value="Completed">Completed</option>
+                    </select>
+                  </div>
+
                   <div className="flex items-end">
                     <button 
                       type="submit"
@@ -258,8 +297,8 @@ export const CareerInsightsPage: React.FC = () => {
                       <div className="space-y-1">
                         <span className="font-bold text-slate-800">{skill.name}</span>
                         <div className="flex gap-1.5 text-[9px] font-bold mt-1">
-                          <span className="px-1.5 bg-blue-50 text-blue-600 rounded-sm">{skill.category}</span>
-                          <span className="px-1.5 bg-slate-150 text-slate-500 rounded-sm">{skill.level || 'Intermediate'}</span>
+                          <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200">{skill.category}</span>
+                          <span className={`px-1.5 py-0.5 rounded border ${getLevelBadgeStyles(skill.level)}`}>{skill.level || 'Intermediate'}</span>
                         </div>
                       </div>
                       
@@ -315,7 +354,7 @@ export const CareerInsightsPage: React.FC = () => {
                   {(!insights.missingSkills || insights.missingSkills.length === 0 || insights.missingSkills[0] === 'None') && (
                     <div className="text-center py-4 text-slate-400 text-xs italic flex items-center gap-1.5 justify-center">
                       <CheckCircle className="w-4.5 h-4.5 text-emerald-500" />
-                      No gaps! You meet industry standards.
+                      All key skills verified!
                     </div>
                   )}
                 </div>

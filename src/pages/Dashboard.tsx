@@ -282,8 +282,16 @@ export const Dashboard: React.FC = () => {
 
               <div className="mt-6 space-y-2 w-full">
                 <div className="flex justify-between items-center text-xs border-b border-slate-150 pb-2">
-                  <span className="text-slate-450 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5 text-blue-500" /> Score Rank</span>
-                  <span className="font-semibold text-slate-700">Excellent</span>
+                  <span className="text-slate-400 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5 text-blue-500" /> Score Rank</span>
+                  <span className={`font-bold uppercase tracking-wider text-[10px] ${
+                    insights.readinessScore >= 85 ? 'text-emerald-650' :
+                    insights.readinessScore >= 70 ? 'text-blue-600' :
+                    insights.readinessScore >= 60 ? 'text-amber-500' : 'text-rose-600'
+                  }`}>
+                    {insights.readinessScore >= 85 ? 'Excellent' :
+                     insights.readinessScore >= 70 ? 'Very Good' :
+                     insights.readinessScore >= 60 ? 'Good' : 'Needs Audit'}
+                  </span>
                 </div>
                 <div className="text-[11px] text-slate-500 mt-2 text-left leading-relaxed">
                   Your score is calculated based on verified certificates, tech project uploads, and skill counts. Uploading additional credentials will boost this score.
@@ -305,14 +313,16 @@ export const Dashboard: React.FC = () => {
                     <ListTodo className="w-3.5 h-3.5" /> Missing Skills Gaps
                   </h4>
                   <div className="flex flex-wrap gap-1.5">
-                    {insights.missingSkills && insights.missingSkills.length > 0 ? (
+                    {insights.missingSkills && insights.missingSkills.length > 0 && insights.missingSkills[0] !== 'None' ? (
                       insights.missingSkills.map((skill: string, index: number) => (
                         <span key={index} className="px-2 py-0.5 border border-slate-200 rounded bg-slate-50 text-[10px] font-semibold text-slate-650">
                           {skill}
                         </span>
                       ))
                     ) : (
-                      <span className="text-xs text-slate-400">All key skills verified!</span>
+                      <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> All key skills verified!
+                      </span>
                     )}
                   </div>
                 </div>

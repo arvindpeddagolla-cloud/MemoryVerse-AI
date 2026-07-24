@@ -4,21 +4,89 @@ import { readDb, writeDb } from '../config/localDb.js';
 
 const router = express.Router();
 
+// Helper function to dynamically update career insights based on user data
+const updateCareerInsights = (userId, db) => {
+  const userDocs = db.documents.filter(d => d.userId === userId);
+  const userSkills = db.skills.filter(s => s.userId === userId);
+  
+  // Calculate readiness score
+  // Baseline: 50%
+  let score = 50;
+  
+  // Documents add points (+6 per document, max 30)
+  score += Math.min(30, userDocs.length * 6);
+  
+  // Skills add points based on proficiency level
+  userSkills.forEach(skill => {
+    const lvl = (skill.level || '').toLowerCase();
+    if (lvl === 'completed') {
+      score += 5;
+    } else if (lvl === 'intermediate') {
+      score += 3;
+    } else if (lvl === 'start') {
+      score += 1;
+    } else if (lvl === 'advanced') {
+      score += 5;
+    } else if (lvl === 'beginner') {
+      score += 1;
+    } else {
+      score += 2; // general default fallback
+    }
+  });
+  
+  const readinessScore = Math.min(99, score);
+  
+  // Map skill distribution dynamically based on category
+  const categories = ['Frontend', 'Backend', 'DevOps', 'Database'];
+  const skillDistribution = categories.map(cat => {
+    const catSkills = userSkills.filter(s => s.category.toLowerCase() === cat.toLowerCase());
+    let mastery = 0;
+    if (catSkills.length > 0) {
+      const totalPoints = catSkills.reduce((sum, s) => {
+        const lvl = (s.level || '').toLowerCase();
+        if (lvl === 'completed' || lvl === 'advanced') return sum + 90;
+        if (lvl === 'intermediate') return sum + 60;
+        return sum + 30; // start / beginner
+      }, 0);
+      mastery = Math.min(100, Math.round(totalPoints / catSkills.length));
+    }
+    return { name: cat, value: mastery || 20 }; // default 20% if none
+  });
+
+  // Calculate missing skills gaps (e.g., if they don't have Docker, CI/CD, GraphQL)
+  const allMissing = ['Docker', 'CI/CD Pipelines', 'GraphQL'];
+  const missingSkills = allMissing.filter(
+    ms => !userSkills.some(us => us.name.toLowerCase() === ms.toLowerCase())
+  );
+
+  db.careerInsights[userId] = {
+    readinessScore,
+    skillDistribution,
+    technologyUsage: [
+      { name: 'React', count: userSkills.filter(s => s.category === 'Frontend').length + 1 },
+      { name: 'Node.js', count: userSkills.filter(s => s.category === 'Backend').length + 1 },
+      { name: 'TypeScript', count: userSkills.filter(s => s.name.toLowerCase() === 'typescript').length + 1 }
+    ],
+    missingSkills: missingSkills.length > 0 ? missingSkills : ['None'],
+    recommendedCertifications: [
+      { title: 'AWS Certified Cloud Practitioner', provider: 'Amazon', difficulty: 'Beginner' },
+      { title: 'MongoDB Certified Developer', provider: 'MongoDB', difficulty: 'Intermediate' }
+    ],
+    suggestedCareerPaths: ['Frontend Engineer', 'Full Stack Developer', 'Cloud Engineer'],
+    industryMatching: Math.min(99, Math.round(readinessScore * 0.95))
+  };
+
+  writeDb(db);
+  return db.careerInsights[userId];
+};
+
 // 1. Get Career Insights
 router.get('/insights', authMiddleware, (req, res) => {
   const userId = req.user.id;
   const db = readDb();
   
-  const insights = db.careerInsights[userId] || {
-    readinessScore: 60,
-    skillDistribution: [],
-    technologyUsage: [],
-    missingSkills: ['None'],
-    recommendedCertifications: [],
-    suggestedCareerPaths: [],
-    industryMatching: 50
-  };
-
+  // Dynamically update and fetch career insights on the fly!
+  const insights = updateCareerInsights(userId, db);
   res.status(200).json(insights);
 });
 
@@ -36,7 +104,6 @@ router.get('/timeline', authMiddleware, (req, res) => {
   const db = readDb();
   const userTimeline = db.timeline.filter(t => t.userId === userId);
   
-  // Sort timeline chronologically (oldest to newest or newest to oldest. Let's send newest first and we can render it appropriately)
   userTimeline.sort((a, b) => new Date(b.date) - new Date(a.date));
   res.status(200).json(userTimeline);
 });
@@ -49,12 +116,9 @@ router.get('/graph', authMiddleware, (req, res) => {
   const docs = db.documents.filter(d => d.userId === userId);
   const skills = db.skills.filter(s => s.userId === userId);
   
-  // Nodes array
   const nodes = [];
-  // Links array
   const links = [];
 
-  // Add root user node
   const user = db.users[userId];
   const userName = user ? user.name : 'Student';
   nodes.push({
@@ -66,7 +130,6 @@ router.get('/graph', authMiddleware, (req, res) => {
     r: 25
   });
 
-  // Unique categories
   const categories = ['Certificates', 'Projects', 'Internships', 'Achievements'];
   const categoryPos = {
     'Certificates': { x: 200, y: 150 },
@@ -85,7 +148,6 @@ router.get('/graph', authMiddleware, (req, res) => {
       r: 20
     });
     
-    // Connect user to categories
     links.push({
       id: `l-${userId}-${cat}`,
       source: userId,
@@ -94,12 +156,10 @@ router.get('/graph', authMiddleware, (req, res) => {
     });
   });
 
-  // Add document nodes and link them to their category
   docs.forEach((doc, idx) => {
     const angle = (idx / docs.length) * Math.PI * 2;
     const cat = doc.metadata.category;
     
-    // If it's a category we aren't tracking as node, skip or map to 'Other'
     if (!categories.includes(cat)) return;
 
     const basePos = categoryPos[cat];
@@ -123,14 +183,10 @@ router.get('/graph', authMiddleware, (req, res) => {
       type: 'document-link'
     });
 
-    // Link documents to skills they teach
     doc.metadata.skills.forEach((skillName, sIdx) => {
-      // Find matching skill node or check if we should map it
       const skillNodeId = `skill-${skillName.toLowerCase()}`;
       
-      // If node doesn't exist yet, add it
       if (!nodes.some(n => n.id === skillNodeId)) {
-        // Place skills around the outer perimeter
         const skillAngle = (sIdx / Math.max(1, doc.metadata.skills.length)) * Math.PI * 2;
         nodes.push({
           id: skillNodeId,
@@ -165,7 +221,6 @@ router.post('/skills', authMiddleware, (req, res) => {
 
   const db = readDb();
   
-  // Check if skill already exists
   const existingSkillIndex = db.skills.findIndex(s => s.userId === userId && s.name.toLowerCase() === name.toLowerCase());
   
   let skill = null;
@@ -186,21 +241,13 @@ router.post('/skills', authMiddleware, (req, res) => {
     db.skills.push(skill);
   }
 
-  // Recalculate Career Readiness slightly (+3 per skill added, max 99)
-  if (db.careerInsights[userId]) {
-    const currentScore = db.careerInsights[userId].readinessScore || 60;
-    db.careerInsights[userId].readinessScore = Math.min(99, currentScore + 3);
-    
-    // Remove from missing skills if it was there
-    db.careerInsights[userId].missingSkills = db.careerInsights[userId].missingSkills.filter(
-      s => s.toLowerCase() !== name.toLowerCase()
-    );
-  }
+  // Recalculate Career Insights dynamically
+  updateCareerInsights(userId, db);
 
   db.notifications.push({
     id: `notif_${Date.now()}`,
     userId,
-    text: `Added skill "${name}" to your profile!`,
+    text: `Added skill "${name}" (${level || 'Intermediate'}) to your profile!`,
     read: false,
     createdAt: new Date().toISOString()
   });
@@ -221,14 +268,10 @@ router.delete('/skills/:id', authMiddleware, (req, res) => {
     return res.status(404).json({ error: 'Skill not found' });
   }
 
-  const deletedSkill = db.skills[skillIndex];
   db.skills.splice(skillIndex, 1);
 
-  // Recalculate Career Readiness slightly (-3 per skill deleted, min 50)
-  if (db.careerInsights[userId]) {
-    const currentScore = db.careerInsights[userId].readinessScore || 60;
-    db.careerInsights[userId].readinessScore = Math.max(50, currentScore - 3);
-  }
+  // Recalculate Career Insights dynamically
+  updateCareerInsights(userId, db);
 
   writeDb(db);
   res.status(200).json({ message: 'Skill deleted successfully', skillId });
