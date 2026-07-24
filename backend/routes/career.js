@@ -1,11 +1,84 @@
 import express from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { readDb, writeDb } from '../config/localDb.js';
+import { genAI } from '../config/gemini.js';
 
 const router = express.Router();
 
+// Helper to analyze gaps and certifications dynamically using Gemini or a smart fallback
+const generateGapsAndCertifications = async (userSkills, userDocs) => {
+  const skillsList = userSkills.map(s => `${s.name} (${s.level || 'Intermediate'})`).join(', ') || 'None';
+  const docsList = userDocs.map(d => `${d.name} (${d.metadata.category})`).join(', ') || 'None';
+
+  if (genAI) {
+    try {
+      console.log('Querying Gemini API for dynamic career gaps and certificate recommendations...');
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const prompt = `
+You are an expert career advisor. Analyze this student's profile:
+- Verified Skills: ${skillsList}
+- Uploaded Credentials & Achievements: ${docsList}
+
+Identify 2-3 specific technical skill gaps they need to resolve to enhance their software developer portfolio. Suggest 2 industry-recognized certifications that match these gaps.
+
+Return ONLY a JSON object matching this schema:
+{
+  "missingSkills": ["Skill Name 1", "Skill Name 2"],
+  "recommendedCertifications": [
+    { "title": "Certification Title", "provider": "Issuing Body (e.g. AWS, Oracle, Google, Meta)", "difficulty": "Beginner/Intermediate/Advanced" }
+  ]
+}
+Do not wrap in markdown styling. Ensure it is valid JSON.
+`;
+
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      });
+      
+      const resText = result.response.text();
+      return JSON.parse(resText.trim());
+    } catch (err) {
+      console.error('Gemini gap analysis failed, using dynamic rule fallback:', err.message);
+    }
+  }
+
+  // Dynamic Rule-Based Analyzer Fallback (Offline Mode)
+  console.log('Running local rule-based gap analyzer fallback...');
+  const hasFrontend = userSkills.some(s => s.category === 'Frontend' || ['react', 'html', 'css', 'javascript', 'tailwind'].includes(s.name.toLowerCase()));
+  const hasBackend = userSkills.some(s => s.category === 'Backend' || ['node', 'express', 'sql', 'mongodb', 'java', 'python', 'graphql'].includes(s.name.toLowerCase()));
+  const hasDevOps = userSkills.some(s => s.category === 'DevOps' || ['docker', 'ci/cd', 'kubernetes', 'aws', 'cloud', 'gcp', 'azure'].includes(s.name.toLowerCase()));
+
+  let missingSkills = [];
+  let recommendedCertifications = [];
+
+  if (!hasFrontend) {
+    missingSkills.push('Frontend UI Layouts (React)', 'CSS Grid & Responsive Design');
+    recommendedCertifications.push({ title: 'Meta Frontend Developer Certificate', provider: 'Coursera', difficulty: 'Beginner' });
+  }
+  if (!hasBackend) {
+    missingSkills.push('REST API Architectures (Node.js)', 'SQL/NoSQL Databases');
+    recommendedCertifications.push({ title: 'MongoDB Certified Developer', provider: 'MongoDB', difficulty: 'Intermediate' });
+  }
+  if (!hasDevOps) {
+    missingSkills.push('Docker Containerization', 'CI/CD Pipelines');
+    recommendedCertifications.push({ title: 'AWS Certified Cloud Practitioner', provider: 'Amazon', difficulty: 'Beginner' });
+  }
+
+  // If they have all core domains covered, suggest senior specializations
+  if (missingSkills.length === 0) {
+    missingSkills.push('System Architecture Design', 'Kubernetes Clusters');
+    recommendedCertifications.push({ title: 'AWS Certified Solutions Architect', provider: 'Amazon', difficulty: 'Intermediate' });
+  }
+
+  return {
+    missingSkills: missingSkills.slice(0, 3),
+    recommendedCertifications: recommendedCertifications.slice(0, 2)
+  };
+};
+
 // Helper function to dynamically update career insights based on user data
-const updateCareerInsights = (userId, db) => {
+const updateCareerInsights = async (userId, db) => {
   const userDocs = db.documents.filter(d => d.userId === userId);
   const userSkills = db.skills.filter(s => s.userId === userId);
   
@@ -53,11 +126,8 @@ const updateCareerInsights = (userId, db) => {
     return { name: cat, value: mastery || 20 }; // default 20% if none
   });
 
-  // Calculate missing skills gaps (e.g., if they don't have Docker, CI/CD, GraphQL)
-  const allMissing = ['Docker', 'CI/CD Pipelines', 'GraphQL'];
-  const missingSkills = allMissing.filter(
-    ms => !userSkills.some(us => us.name.toLowerCase() === ms.toLowerCase())
-  );
+  // Fetch Gaps & Certifications dynamically using Gemini or fallback
+  const analysis = await generateGapsAndCertifications(userSkills, userDocs);
 
   db.careerInsights[userId] = {
     readinessScore,
@@ -67,11 +137,8 @@ const updateCareerInsights = (userId, db) => {
       { name: 'Node.js', count: userSkills.filter(s => s.category === 'Backend').length + 1 },
       { name: 'TypeScript', count: userSkills.filter(s => s.name.toLowerCase() === 'typescript').length + 1 }
     ],
-    missingSkills: missingSkills.length > 0 ? missingSkills : ['None'],
-    recommendedCertifications: [
-      { title: 'AWS Certified Cloud Practitioner', provider: 'Amazon', difficulty: 'Beginner' },
-      { title: 'MongoDB Certified Developer', provider: 'MongoDB', difficulty: 'Intermediate' }
-    ],
+    missingSkills: analysis.missingSkills.length > 0 ? analysis.missingSkills : ['None'],
+    recommendedCertifications: analysis.recommendedCertifications,
     suggestedCareerPaths: ['Frontend Engineer', 'Full Stack Developer', 'Cloud Engineer'],
     industryMatching: Math.min(99, Math.round(readinessScore * 0.95))
   };
@@ -81,13 +148,17 @@ const updateCareerInsights = (userId, db) => {
 };
 
 // 1. Get Career Insights
-router.get('/insights', authMiddleware, (req, res) => {
-  const userId = req.user.id;
-  const db = readDb();
-  
-  // Dynamically update and fetch career insights on the fly!
-  const insights = updateCareerInsights(userId, db);
-  res.status(200).json(insights);
+router.get('/insights', authMiddleware, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const db = readDb();
+    
+    // Dynamically update and fetch career insights on the fly!
+    const insights = await updateCareerInsights(userId, db);
+    res.status(200).json(insights);
+  } catch (error) {
+    next(error);
+  }
 });
 
 // 2. Get User Skills List
@@ -211,70 +282,78 @@ router.get('/graph', authMiddleware, (req, res) => {
 });
 
 // 5. Add Skill Manually (User or AI suggestion)
-router.post('/skills', authMiddleware, (req, res) => {
-  const userId = req.user.id;
-  const { name, category, level } = req.body;
-  
-  if (!name) {
-    return res.status(400).json({ error: 'Skill name is required' });
-  }
+router.post('/skills', authMiddleware, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { name, category, level } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Skill name is required' });
+    }
 
-  const db = readDb();
-  
-  const existingSkillIndex = db.skills.findIndex(s => s.userId === userId && s.name.toLowerCase() === name.toLowerCase());
-  
-  let skill = null;
-  if (existingSkillIndex > -1) {
-    db.skills[existingSkillIndex].count = (db.skills[existingSkillIndex].count || 1) + 1;
-    if (level) db.skills[existingSkillIndex].level = level;
-    if (category) db.skills[existingSkillIndex].category = category;
-    skill = db.skills[existingSkillIndex];
-  } else {
-    skill = {
-      id: `sk_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+    const db = readDb();
+    
+    const existingSkillIndex = db.skills.findIndex(s => s.userId === userId && s.name.toLowerCase() === name.toLowerCase());
+    
+    let skill = null;
+    if (existingSkillIndex > -1) {
+      db.skills[existingSkillIndex].count = (db.skills[existingSkillIndex].count || 1) + 1;
+      if (level) db.skills[existingSkillIndex].level = level;
+      if (category) db.skills[existingSkillIndex].category = category;
+      skill = db.skills[existingSkillIndex];
+    } else {
+      skill = {
+        id: `sk_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        userId,
+        name,
+        level: level || 'Intermediate',
+        category: category || 'General',
+        count: 1
+      };
+      db.skills.push(skill);
+    }
+
+    // Recalculate Career Insights dynamically
+    await updateCareerInsights(userId, db);
+
+    db.notifications.push({
+      id: `notif_${Date.now()}`,
       userId,
-      name,
-      level: level || 'Intermediate',
-      category: category || 'General',
-      count: 1
-    };
-    db.skills.push(skill);
+      text: `Added skill "${name}" (${level || 'Intermediate'}) to your profile!`,
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
+    writeDb(db);
+    res.status(201).json({ message: 'Skill added successfully', skill });
+  } catch (error) {
+    next(error);
   }
-
-  // Recalculate Career Insights dynamically
-  updateCareerInsights(userId, db);
-
-  db.notifications.push({
-    id: `notif_${Date.now()}`,
-    userId,
-    text: `Added skill "${name}" (${level || 'Intermediate'}) to your profile!`,
-    read: false,
-    createdAt: new Date().toISOString()
-  });
-
-  writeDb(db);
-  res.status(201).json({ message: 'Skill added successfully', skill });
 });
 
 // 6. Delete Skill
-router.delete('/skills/:id', authMiddleware, (req, res) => {
-  const userId = req.user.id;
-  const skillId = req.params.id;
+router.delete('/skills/:id', authMiddleware, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const skillId = req.params.id;
 
-  const db = readDb();
-  const skillIndex = db.skills.findIndex(s => s.userId === userId && s.id === skillId);
+    const db = readDb();
+    const skillIndex = db.skills.findIndex(s => s.userId === userId && s.id === skillId);
 
-  if (skillIndex === -1) {
-    return res.status(404).json({ error: 'Skill not found' });
+    if (skillIndex === -1) {
+      return res.status(404).json({ error: 'Skill not found' });
+    }
+
+    db.skills.splice(skillIndex, 1);
+
+    // Recalculate Career Insights dynamically
+    await updateCareerInsights(userId, db);
+
+    writeDb(db);
+    res.status(200).json({ message: 'Skill deleted successfully', skillId });
+  } catch (error) {
+    next(error);
   }
-
-  db.skills.splice(skillIndex, 1);
-
-  // Recalculate Career Insights dynamically
-  updateCareerInsights(userId, db);
-
-  writeDb(db);
-  res.status(200).json({ message: 'Skill deleted successfully', skillId });
 });
 
 export default router;
