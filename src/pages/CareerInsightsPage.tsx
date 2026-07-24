@@ -374,36 +374,39 @@ export const CareerInsightsPage: React.FC = () => {
                 <h3 className="font-bold text-sm text-slate-800 mb-4 flex items-center gap-1.5">
                   <AlertCircle className="w-4.5 h-4.5 text-amber-500" /> Skill Gap Highlights
                 </h3>
-                <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                  Recruiters looking for your matching roles frequently search for these missing competencies:
-                </p>
 
-                <div className="space-y-2">
-                  {insights.missingSkills?.map((skill: string, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700">
-                      <div className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0"></span>
-                        <span className="font-semibold">{skill}</span>
-                      </div>
-                      
-                      {skill !== 'None' && (
-                        <button 
-                          onClick={() => handleAddSuggestedSkill(skill)}
-                          disabled={actionLoading}
-                          className="px-2 py-0.5 border border-blue-250 hover:border-blue-300 text-blue-600 rounded bg-white font-bold text-[9px] flex items-center gap-0.5 shadow-sm transition"
-                        >
-                          <Plus className="w-3 h-3" /> Add
-                        </button>
-                      )}
+                {insights.missingSkills && insights.missingSkills.length > 0 && insights.missingSkills[0] !== 'None' ? (
+                  <>
+                    <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                      Recruiters looking for your matching roles frequently search for these missing competencies:
+                    </p>
+
+                    <div className="space-y-2">
+                      {insights.missingSkills.map((skill: string, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700">
+                          <div className="flex items-center gap-2">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0"></span>
+                            <span className="font-semibold">{skill}</span>
+                          </div>
+                          
+                          <button 
+                            onClick={() => handleAddSuggestedSkill(skill)}
+                            disabled={actionLoading}
+                            className="px-2 py-0.5 border border-blue-250 hover:border-blue-300 text-blue-600 rounded bg-white font-bold text-[9px] flex items-center gap-0.5 shadow-sm transition"
+                          >
+                            <Plus className="w-3 h-3" /> Add
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                  {(!insights.missingSkills || insights.missingSkills.length === 0 || insights.missingSkills[0] === 'None') && (
-                    <div className="text-center py-4 text-slate-400 text-xs italic flex items-center gap-1.5 justify-center">
-                      <CheckCircle className="w-4.5 h-4.5 text-emerald-500" />
-                      All key skills verified!
-                    </div>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  <div className="text-center py-6 text-slate-500 text-xs flex flex-col items-center justify-center gap-2 bg-emerald-50/30 border border-emerald-100 rounded-lg">
+                    <CheckCircle className="w-8 h-8 text-emerald-500" />
+                    <span className="font-bold text-emerald-700">All key skills verified!</span>
+                    <span className="text-[10px] text-slate-450">No outstanding skill gaps identified.</span>
+                  </div>
+                )}
               </div>
 
               {/* Recommended Certifications */}
