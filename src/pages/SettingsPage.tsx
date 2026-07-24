@@ -73,9 +73,28 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleExportData = () => {
-    // Navigate to absolute backend link to trigger file download attachment
-    window.location.href = `http://localhost:5000/api/settings/export?token=${localStorage.getItem('memoryverse_token')}`;
+  const handleExportData = async () => {
+    try {
+      setSuccess(null);
+      setError(null);
+      const response = await api.get('/settings/export');
+      
+      // Trigger a programmatic JSON download in the client browser
+      const dataStr = JSON.stringify(response.data, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `MemoryVerse_Export_${name.replace(/\s+/g, '_') || 'Profile'}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setSuccess('Digital footprint exported successfully!');
+    } catch (err: any) {
+      console.error('Export failed:', err);
+      setError('Failed to export digital credentials.');
+    }
   };
 
   const handleDeleteAccount = async () => {
