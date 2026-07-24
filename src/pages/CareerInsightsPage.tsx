@@ -100,6 +100,32 @@ export const CareerInsightsPage: React.FC = () => {
     }
   };
 
+  const handleCycleSkillLevel = async (skillId: string, name: string, category: string, currentLevel: string) => {
+    let nextLevel = 'Intermediate';
+    const lower = (currentLevel || '').toLowerCase();
+    if (lower === 'start' || lower === 'beginner') {
+      nextLevel = 'Intermediate';
+    } else if (lower === 'intermediate') {
+      nextLevel = 'Completed';
+    } else if (lower === 'completed' || lower === 'advanced') {
+      nextLevel = 'Start';
+    }
+    
+    setActionLoading(true);
+    try {
+      await api.post('/career/skills', {
+        name,
+        category,
+        level: nextLevel
+      });
+      await fetchInsightsAndSkills();
+    } catch (err) {
+      console.error('Failed to cycle skill level:', err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const getScoreRank = (score: number) => {
     if (score >= 85) return 'Excellent';
     if (score >= 70) return 'Very Good';
@@ -299,10 +325,26 @@ export const CareerInsightsPage: React.FC = () => {
                   {skills.map((skill: any) => (
                     <div key={skill.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between text-xs hover:border-slate-300 transition">
                       <div className="space-y-1">
-                        <span className="font-bold text-slate-800">{skill.name}</span>
+                        <span 
+                          onClick={() => {
+                            setNewSkillName(skill.name);
+                            setNewSkillCategory(skill.category);
+                            setNewSkillLevel(skill.level || 'Intermediate');
+                          }}
+                          className="font-bold text-slate-800 cursor-pointer hover:text-blue-600 transition"
+                          title="Click to edit this skill"
+                        >
+                          {skill.name}
+                        </span>
                         <div className="flex gap-1.5 text-[9px] font-bold mt-1">
                           <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200">{skill.category}</span>
-                          <span className={`px-1.5 py-0.5 rounded border ${getLevelBadgeStyles(skill.level)}`}>{skill.level || 'Intermediate'}</span>
+                          <span 
+                            onClick={() => handleCycleSkillLevel(skill.id, skill.name, skill.category, skill.level)}
+                            className={`px-1.5 py-0.5 rounded border cursor-pointer hover:brightness-95 hover:border-blue-300 transition flex items-center gap-0.5 ${getLevelBadgeStyles(skill.level)}`}
+                            title="Click to cycle: Start ➜ Intermediate ➜ Completed"
+                          >
+                            {skill.level || 'Intermediate'} <span className="text-[7px]">🔄</span>
+                          </span>
                         </div>
                       </div>
                       
