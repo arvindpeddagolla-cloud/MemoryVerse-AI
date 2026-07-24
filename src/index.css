@@ -4,6 +4,16 @@
   body {
     @apply bg-slate-50 text-slate-900 font-sans antialiased;
   }
+  
+  /* Force pointer cursor on hover for all buttons and interactive elements */
+  button,
+  a,
+  input[type="button"],
+  input[type="submit"],
+  [role="button"],
+  .clickable {
+    cursor: pointer !important;
+  }
 }
 
 /* Custom Scrollbar */
