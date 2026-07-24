@@ -237,53 +237,57 @@ export const CareerInsightsPage: React.FC = () => {
                 </div>
 
                 {/* Add Skill Form */}
-                <form onSubmit={handleAddSkill} className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 p-4 border border-slate-200 rounded-lg mb-6">
-                  <div>
-                    <label className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block mb-1">Skill Name</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Docker, Java"
-                      value={newSkillName}
-                      onChange={(e) => setNewSkillName(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-250 bg-white rounded text-xs font-semibold focus:outline-none focus:border-blue-500 transition"
-                      required
-                    />
-                  </div>
+                <form onSubmit={handleAddSkill} className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 border border-slate-200 rounded-lg mb-6">
+                  <div className="md:col-span-2 space-y-3">
+                    <div>
+                      <label className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block mb-1">Skill Name</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Docker, Java"
+                        value={newSkillName}
+                        onChange={(e) => setNewSkillName(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-250 bg-white rounded text-xs font-semibold focus:outline-none focus:border-blue-500 transition"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block mb-1">Category</label>
+                        <select 
+                          value={newSkillCategory}
+                          onChange={(e) => setNewSkillCategory(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-250 bg-white rounded text-xs font-semibold focus:outline-none focus:border-blue-500 transition"
+                        >
+                          <option value="Frontend">Frontend</option>
+                          <option value="Backend">Backend</option>
+                          <option value="DevOps">DevOps</option>
+                          <option value="Database">Database</option>
+                          <option value="Languages">Languages</option>
+                          <option value="General">General</option>
+                        </select>
+                      </div>
 
-                  <div>
-                    <label className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block mb-1">Category</label>
-                    <select 
-                      value={newSkillCategory}
-                      onChange={(e) => setNewSkillCategory(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-250 bg-white rounded text-xs font-semibold focus:outline-none focus:border-blue-500 transition"
-                    >
-                      <option value="Frontend">Frontend</option>
-                      <option value="Backend">Backend</option>
-                      <option value="DevOps">DevOps</option>
-                      <option value="Database">Database</option>
-                      <option value="Languages">Languages</option>
-                      <option value="General">General</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block mb-1">Level</label>
-                    <select 
-                      value={newSkillLevel}
-                      onChange={(e) => setNewSkillLevel(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-250 bg-white rounded text-xs font-semibold focus:outline-none focus:border-blue-500 transition"
-                    >
-                      <option value="Start">Start</option>
-                      <option value="Intermediate">Intermediate</option>
-                      <option value="Completed">Completed</option>
-                    </select>
+                      <div>
+                        <label className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block mb-1">Level</label>
+                        <select 
+                          value={newSkillLevel}
+                          onChange={(e) => setNewSkillLevel(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-250 bg-white rounded text-xs font-semibold focus:outline-none focus:border-blue-500 transition"
+                        >
+                          <option value="Start">Start</option>
+                          <option value="Intermediate">Intermediate</option>
+                          <option value="Completed">Completed</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex items-end">
                     <button 
                       type="submit"
                       disabled={actionLoading}
-                      className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold shadow-md shadow-blue-500/10 transition flex items-center justify-center gap-1"
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold shadow-md shadow-blue-500/10 transition flex items-center justify-center gap-1 h-9 md:h-10"
                     >
                       <Plus className="w-3.5 h-3.5" /> Add Skill
                     </button>
