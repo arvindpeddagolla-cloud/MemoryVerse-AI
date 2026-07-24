@@ -14,8 +14,30 @@ router.post('/chat', authMiddleware, async (req, res, next) => {
       return res.status(400).json({ error: 'Prompt is required' });
     }
 
+    const userId = req.user.id;
+    const db = readDb();
+    const user = db.users[userId] || {};
+    const userSkills = db.skills.filter(s => s.userId === userId).map(s => `${s.name} (${s.level || 'Intermediate'})`);
+    const userDocs = db.documents.filter(d => d.userId === userId).map(d => `${d.name} (${d.metadata.category})`);
+    const careerInsights = db.careerInsights[userId] || {};
+
+    const systemContext = `
+You are the MemoryVerse AI Career Assistant, a professional context-aware career advisor.
+Here is the live verified profile context of the student you are talking to:
+- Name: ${user.name || 'Student'}
+- Current Career Readiness Score: ${careerInsights.readinessScore || 60}%
+- Verified Skills List: ${userSkills.join(', ') || 'No skills added yet'}
+- Uploaded Credentials & Documents: ${userDocs.join(', ') || 'No documents uploaded yet'}
+- Missing Gaps identified: ${careerInsights.missingSkills ? careerInsights.missingSkills.join(', ') : 'None'}
+
+When answering questions:
+1. Base your recommendations, feedback, and guidance strictly on these verified uploads, skills, and readiness scores.
+2. If the user asks about skill gaps or certification recommendations, structure your answer clearly using their verified skills as the foundation, highlighting specific technical skill gaps and recommended learning paths with credentials. For example, if they have React and Python, mention that their projects lack Docker or cloud credentials, and suggest certifications like AWS Certified Cloud Practitioner.
+3. Keep your advice professional, encouraging, and highly actionable.
+`;
+
     const chatHistory = messages || [];
-    const reply = await generateAiChatResponse(chatHistory, prompt);
+    const reply = await generateAiChatResponse(chatHistory, prompt, systemContext, { userSkills, userDocs, careerInsights, name: user.name });
     
     res.status(200).json({ reply });
   } catch (error) {

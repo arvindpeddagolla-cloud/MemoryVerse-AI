@@ -171,11 +171,16 @@ Ensure you ONLY return the raw JSON object. Use double quotes. Do not include an
   };
 };
 
-export const generateAiChatResponse = async (chatHistory, prompt) => {
+export const generateAiChatResponse = async (chatHistory, prompt, systemContext, userProfileContext) => {
   if (genAI) {
     try {
       console.log('Generating AI chat response using Gemini...');
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      // Set system context as instruction parameter on model setup
+      const model = genAI.getGenerativeModel({ 
+        model: 'gemini-1.5-flash',
+        systemInstruction: systemContext || 'You are a helpful career assistant.'
+      });
+      
       const historyFormatted = chatHistory.map(ch => ({
         role: ch.role === 'user' ? 'user' : 'model',
         parts: [{ text: ch.content }]
@@ -192,25 +197,30 @@ export const generateAiChatResponse = async (chatHistory, prompt) => {
     }
   }
 
-  // Local Chat Mock Responder
+  // Local Chat Mock Responder using real user context!
   const cleanPrompt = prompt.toLowerCase();
+  const userName = userProfileContext?.name || 'Student';
+  const skillsListStr = userProfileContext?.userSkills?.length > 0 
+    ? userProfileContext.userSkills.map(s => s.split(' (')[0]).join(', ')
+    : 'React, TypeScript, Python';
+  
   if (cleanPrompt.includes('summarize my resume') || cleanPrompt.includes('summary')) {
-    return `### Executive Career Summary
+    return `### Executive Career Summary for ${userName}
 
 A highly motivated Software Engineering Student with verified technical competency in frontend applications, backend database structures, and machine learning models. 
 
 **Key Qualifications:**
-* **Frontend:** Advanced proficiency in React, TypeScript, and responsive styling.
+* **Verified Skills:** ${skillsListStr}
 * **Backend:** Experience designing REST APIs using Node.js/Express, structured schema management, and SQL databases.
-* **Highlights:** Winner of the National Developer Hackathon, completed a Software Engineering Internship, and earned multiple verified certifications.
+* **Highlights:** Completed multiple verified learning paths and credentials.
 
 *This summary is dynamically compiled from your verified academic records.*`;
   }
   
-  if (cleanPrompt.includes('missing skills') || cleanPrompt.includes('suggest') || cleanPrompt.includes('recommend')) {
+  if (cleanPrompt.includes('missing skills') || cleanPrompt.includes('suggest') || cleanPrompt.includes('recommend') || cleanPrompt.includes('gap')) {
     return `### Skill Gap & Certification Recommendations
 
-Based on your verified uploads, you have strong foundations in **Frontend Web Technologies (React, TypeScript)** and **Scripting (Python)**. Here are recommendations to boost your professional portfolio:
+Based on your verified uploads, you have strong foundations in **${skillsListStr}**. Here are recommendations to boost your professional portfolio:
 
 #### 1. Technical Skill Gaps Identified:
 * **Containerization & DevOps:** Your projects lack verified deployment/containerization configurations. Consider learning **Docker** and basic **CI/CD pipeline concepts**.
@@ -226,23 +236,23 @@ Based on your verified uploads, you have strong foundations in **Frontend Web Te
   if (cleanPrompt.includes('interview') || cleanPrompt.includes('preparation') || cleanPrompt.includes('roadmap')) {
     return `### Personalized Interview Preparation Roadmap
 
-Here is a 4-week preparation plan customized to your profile (Web Developer & React Specialist):
+Here is a 4-week preparation plan customized to your profile:
 
-#### **Week 1: Data Structures & Algorithms (Python/JS)**
+#### **Week 1: Data Structures & Algorithms**
 * Focus on Arrays, Hash Maps, Two Pointers, and Sliding Window patterns.
-* Solve 3 problems daily on LeetCode (Easy/Medium level).
+* Solve 3 problems daily on LeetCode.
 
-#### **Week 2: Advanced React & Web Performance**
+#### **Week 2: Advanced Technical Knowledge**
 * Prepare for questions on: Virtual DOM, hooks lifecycle, render optimizations, and custom hook implementation.
-* Build a mock application using Context API to demonstrate state flow.
+* Build a mock application to demonstrate state flow.
 
 #### **Week 3: System Design & RESTful APIs**
 * Understand HTTP codes, database schema design, and load balancing.
-* Practice designing a scalable service like "Google Drive Upload" or "Chat Messaging".
+* Practice designing a scalable service like "Google Drive Upload".
 
 #### **Week 4: Behavior & Portfolio Showcase**
 * Structure behavioral questions using the **STAR Method** (Situation, Task, Action, Result).
-* Prepare a 2-minute walkthrough of your verified Hackathon Project.`;
+* Prepare a 2-minute walkthrough of your verified accomplishments.`;
   }
 
   return `I am your MemoryVerse AI Career Assistant. Based on your uploaded documents, I can help you with:
